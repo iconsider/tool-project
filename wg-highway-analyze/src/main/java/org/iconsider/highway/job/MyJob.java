@@ -97,10 +97,10 @@ public class MyJob implements Serializable {
             }
         }).foreach(new VoidFunction<UserReport>() {
             public void call(UserReport userReport) throws Exception {
-//                double speed = userReport.getDistance()/userReport.getTime();
-//                if(speed > 80 && speed < 120) {
-//                    System.out.println(String.format("speed:%.2f, modle:%s", speed, userReport));
-//                }
+                double speed = userReport.getDistance()/userReport.getTime();
+                if(speed > 80 && speed < 120) {
+                    System.out.println(String.format("speed:%.2f, modle:%s", speed, userReport));
+                }
             }
         });
 
