@@ -17,6 +17,10 @@ public class Record implements Serializable {
     private long lasttime;
     private String cgi;
     private long startTimeStamp;
+    //拓展字段
+//    private int cellId;
+//    private double distance;
+//    private String direction;
 
     public String getMsisdn() {
         return msisdn;
@@ -50,6 +54,30 @@ public class Record implements Serializable {
         this.startTimeStamp = startTimeStamp;
     }
 
+//    public int getCellId() {
+//        return cellId;
+//    }
+//
+//    public void setCellId(int cellId) {
+//        this.cellId = cellId;
+//    }
+//
+//    public double getDistance() {
+//        return distance;
+//    }
+//
+//    public void setDistance(double distance) {
+//        this.distance = distance;
+//    }
+//
+//    public String getDirection() {
+//        return direction;
+//    }
+//
+//    public void setDirection(String direction) {
+//        this.direction = direction;
+//    }
+
     public Record(String record) {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
@@ -69,6 +97,9 @@ public class Record implements Serializable {
             }
         }
 
+    }
+
+    public Record() {
     }
 
     private void setNull() {
