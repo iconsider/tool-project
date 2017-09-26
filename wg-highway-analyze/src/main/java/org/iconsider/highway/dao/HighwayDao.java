@@ -40,6 +40,23 @@ public class HighwayDao {
         return map;
     }
 
+    public Map<Integer, Double> getCellDistance() {
+        ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("applicationContext.xml");
+        JdbcTemplate jdbcTemple = context.getBean("postgresJdbcTemplate", JdbcTemplate.class);
+        Map<Integer,Double> map = new HashMap<Integer,Double>();
+
+        String sql = "select cell_id,distance from d_hx_highway_cell";
+        SqlRowSet rs = jdbcTemple.queryForRowSet(sql);
+        while(rs.next()) {
+            int cellId = rs.getInt("cell_id");
+            double distance = rs.getDouble("distance");
+
+            map.put(cellId, distance);
+
+        }
+        return map;
+    }
+
     public int getSectionIdByCgi(String cgi) {
         ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("applicationContext.xml");
         JdbcTemplate jdbcTemple = context.getBean("postgresJdbcTemplate", JdbcTemplate.class);
@@ -50,7 +67,24 @@ public class HighwayDao {
             }
         });
 
-        if(list.size() == 1) {
+        if(list != null && list.size() == 1) {
+            return list.get(0);
+        } else {
+            return -1;
+        }
+    }
+
+    public double getDistanceByCellId(int minCellId, int maxCellId) {
+        ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("applicationContext.xml");
+        JdbcTemplate jdbcTemple = context.getBean("postgresJdbcTemplate", JdbcTemplate.class);
+
+        List<Double> list = jdbcTemple.query(String.format("select sum(distance) as \"distance\" from d_hx_highway_cell where cell_id>=%s and cell_id<=%s;", minCellId, maxCellId), new RowMapper<Double>() {
+            public Double mapRow(ResultSet resultSet, int i) throws SQLException {
+                return resultSet.getDouble("distance");
+            }
+        });
+
+        if(list != null && list.size() == 1) {
             return list.get(0);
         } else {
             return -1;
@@ -64,6 +98,10 @@ public class HighwayDao {
 //        System.out.println(map.get("10411-1326"));
 
 
-        System.out.println(dao.getSectionIdByCgi("657635-11"));
+//        System.out.println(dao.getSectionIdByCgi("657635-11"));
+//        System.out.println(dao.getDistanceByCellId(2066,2116));
+        Map<Integer, Double> map = dao.getCellDistance();
+        System.out.println(map.size());
+        System.out.println(map.get(100));
     }
 }

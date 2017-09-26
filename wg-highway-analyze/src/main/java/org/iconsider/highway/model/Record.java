@@ -119,6 +119,8 @@ public class Record implements Serializable {
                 ", cgi='" + cgi + '\'' +
                 ", startTimeStamp=" + sdf.format(startTimeStamp) +
                 '}';
+
+//        return String.format("{cgi:%s, st:%s,lt:%s}",cgi,sdf.format(startTimeStamp),sdf.format(lasttime));
     }
 
     public static void main(String[] args) {

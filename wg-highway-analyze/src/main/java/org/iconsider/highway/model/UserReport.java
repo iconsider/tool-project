@@ -11,6 +11,7 @@ public class UserReport implements Serializable {
     private String direction;
     private double distance;
     private double time;  //hour
+    private double speed;
 
     public String getSectionId() {
         return sectionId;
@@ -44,6 +45,14 @@ public class UserReport implements Serializable {
         this.time = time;
     }
 
+    public double getSpeed() {
+        return speed;
+    }
+
+    public void setSpeed(double speed) {
+        this.speed = speed;
+    }
+
     public UserReport(String sectionId, String direction, double distance, double time) {
         this.sectionId = sectionId;
         this.direction = direction;
@@ -51,13 +60,15 @@ public class UserReport implements Serializable {
         this.time = time;
     }
 
+
     @Override
     public String toString() {
         return "UserReport{" +
                 "sectionId='" + sectionId + '\'' +
                 ", direction='" + direction + '\'' +
-                ", distance=" + distance +
-                ", time=" + time +
+                ", distance=" + String.format("%.2f",distance) +
+                ", time=" + String.format("%.2f",time) +
+                ", speed=" + speed +
                 '}';
     }
 }

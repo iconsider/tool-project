@@ -18,7 +18,8 @@ import java.util.*;
  */
 public class MyJob implements Serializable {
     private static final long serialVersionUID = 1546386160228769866L;
-    Map<String, Cell> cellInfoMap = null;  //key,value -> cgi,cell
+    Map<String, Cell> cgiCellMap = null;  //key,value -> cgi,cell
+    Map<Integer, Double> cellIdDistanceMap = null;  //key,value -> cellId,distance
 
     public void execute(SparkConf conf) {
         this.task0(conf);
@@ -27,7 +28,9 @@ public class MyJob implements Serializable {
 
     public void task0(SparkConf sparkConf) {
         JavaSparkContext javaSparkContext = new JavaSparkContext(sparkConf);
-        JavaRDD<String> fiveMinRecordRDD = javaSparkContext.textFile("hdfs://host1:9000/user/hanxinnil/highwayInfo/201709221400");
+//        JavaRDD<String> fiveMinRecordRDD = javaSparkContext.textFile("hdfs://host1:9000/user/hanxinnil/highwayInfo/201709221400");
+        JavaRDD<String> fiveMinRecordRDD = javaSparkContext.textFile("hdfs://host1:9000/user/hanxinnil/highwayInfo/201709221420");
+//        JavaRDD<String> fiveMinRecordRDD = javaSparkContext.textFile("hdfs://host1:9000/user/hanxinnil/highwayInfo/201709221440");
 
 
         fiveMinRecordRDD.mapPartitionsToPair(new PairFlatMapFunction<Iterator<String>, String, List<Record>>() {
@@ -36,9 +39,9 @@ public class MyJob implements Serializable {
 
                 //剔除常驻用户
                 Set<String> residentUserSet = new HashSet<String>();
-                residentUserSet.add("18820075738");
-                residentUserSet.add("18814371663");
-                residentUserSet.add("18813800322");
+//                residentUserSet.add("18820075738");
+//                residentUserSet.add("18814371663");
+//                residentUserSet.add("18813800322");
 
                 while (lines.hasNext()) {
                     Record record = new Record(lines.next());
@@ -57,50 +60,30 @@ public class MyJob implements Serializable {
                 records1.addAll(records2);
                 return records1;
             }
-        }).filter(new Function<Tuple2<String, List<Record>>, Boolean>() {           //把Record对象数量小于n的msisdn过滤
+        }).filter(new Function<Tuple2<String, List<Record>>, Boolean>() {           //把Record对象数量小于1的msisdn过滤
             public Boolean call(Tuple2<String, List<Record>> tuple) throws Exception {
-                if (tuple._2.size() <= 1) {
+                if (tuple._2.size() <= 1 || tuple._1.length() != 11) {  //过滤用户记录cgi小于等于1，电话号码长度不是11位
+                    return false;
+                } else if (isAllCgiSame(tuple._2)) {
                     return false;
                 } else {
                     return true;
                 }
             }
-        }).mapPartitions(new FlatMapFunction<Iterator<Tuple2<String, List<Record>>>, Tuple2<String, List<Record>>>() {   //根据lastTime进行升序排序
-            public Iterable<Tuple2<String, List<Record>>> call(Iterator<Tuple2<String, List<Record>>> iterator) throws Exception {
-                List<Tuple2<String, List<Record>>> list = new ArrayList<Tuple2<String, List<Record>>>();
+        }).mapToPair(new PairFunction<Tuple2<String, List<Record>>, Integer, Integer>() {
+            public Tuple2<Integer, Integer> call(Tuple2<String, List<Record>> tuple2) throws Exception {
+                UserReport userReport = userAnalyze(tuple2._2);
+                int speed = (int) ((userReport.getDistance()/1000)/(userReport.getTime()/60));
 
-                while (iterator.hasNext()) {
-                    Tuple2<String, List<Record>> tuple = iterator.next();
-
-                    Collections.sort(tuple._2, new Comparator<Record>() {  //升序排列
-                        public int compare(Record o1, Record o2) {
-                            if (o1.getLasttime() - o2.getLasttime() > 0) {
-                                return 1;
-                            } else if (o1.getLasttime() - o2.getLasttime() < 0) {
-                                return -1;
-                            }
-                            return 0;
-                        }
-                    });
-                    list.add(new Tuple2<String, List<Record>>(tuple._1, tuple._2));
-                }
-                return list;
+                return new Tuple2<Integer, Integer>(speed/10, 1);
             }
-        }).map(new Function<Tuple2<String, List<Record>>, UserReport>() {
-            public UserReport call(Tuple2<String, List<Record>> tuple2) throws Exception {
-                System.out.println(tuple2._1);
-                for (Record record : tuple2._2) {
-                    System.out.println(record);
-                }
-                System.out.println("-----------------------------");
-                return userAnalyze(tuple2);
+        }).reduceByKey(new Function2<Integer, Integer, Integer>() {
+            public Integer call(Integer integer, Integer integer2) throws Exception {
+                return integer+integer2;
             }
-        }).foreach(new VoidFunction<UserReport>() {
-            public void call(UserReport userReport) throws Exception {
-                double speed = userReport.getDistance()/userReport.getTime();
-                if(speed > 80 && speed < 120) {
-                    System.out.println(String.format("speed:%.2f, modle:%s", speed, userReport));
-                }
+        }).foreach(new VoidFunction<Tuple2<Integer, Integer>>() {
+            public void call(Tuple2<Integer, Integer> tuple2) throws Exception {
+                System.out.println(String.format("speed:%04d, number:%s", tuple2._1, tuple2._2));
             }
         });
 
@@ -109,29 +92,66 @@ public class MyJob implements Serializable {
     }
 
 
-    public UserReport userAnalyze(Tuple2<String, List<Record>> tuple) {
-        if(null == cellInfoMap) {
+    public UserReport userAnalyze(List<Record> userRecordList) {
+        if(null == cgiCellMap) {
             HighwayDao dao = new HighwayDao();
-            cellInfoMap = dao.getAllCell();
+            cgiCellMap = dao.getAllCell();
+        }
+        if(null == cellIdDistanceMap) {
+            HighwayDao dao = new HighwayDao();
+            cellIdDistanceMap = dao.getCellDistance();
         }
 
+        double time = ((userRecordList.size()) * 5);
+
+        Set<Integer> cellIdSet = new HashSet<Integer>();
         double distance = 0D;
-        double time = ((tuple._2.size() - 1) * 5) / 60D;
-        for (Record record : tuple._2) {
-            Cell cell = cellInfoMap.get(record.getCgi());
-            distance += cell.getDistance();
+        for (Record record : userRecordList) {
+            cellIdSet.add(cgiCellMap.get(record.getCgi()).getCellId());
         }
-        return new UserReport("unknown_sectionId", "unknown_direction", distance/1000D, time);
+        int minCellId = Collections.min(cellIdSet);
+        int maxCellId = Collections.max(cellIdSet);
+        if (maxCellId - minCellId < 152) {
+            for (int i = minCellId; i < maxCellId; i++) {
+                distance += cellIdDistanceMap.get(i);
+            }
+        }
+
+        return new UserReport("unknown_sectionId", "unknown_direction", distance, time);
+    }
+
+
+
+
+
+    /**
+     * @param list
+     * @return
+     * 判断一个用户的记录是否都属于同一个cgi
+     * 所有cgi一样则返回true
+     * 只要有一个cgi不一样，则返回false
+     *
+     */
+    public boolean isAllCgiSame(List<Record> list) {
+        Set<String> cgis = new HashSet<String>();
+        for (Record record : list) {
+            cgis.add(record.getCgi());
+        }
+        if(cgis.size() > 1) {
+            return false;
+        } else {
+            return true;
+        }
     }
 
     public boolean isInSameSection(String beginCgi, String endCgi) {
-        if(null == cellInfoMap) {
+        if(null == cgiCellMap) {
             HighwayDao dao = new HighwayDao();
-            cellInfoMap = dao.getAllCell();
+            cgiCellMap = dao.getAllCell();
         }
 
-        int beginSectionId = cellInfoMap.get(beginCgi).getSectionId();
-        int endSectionId = cellInfoMap.get(endCgi).getSectionId();
+        int beginSectionId = cgiCellMap.get(beginCgi).getSectionId();
+        int endSectionId = cgiCellMap.get(endCgi).getSectionId();
 
         if(beginSectionId == endSectionId) {
             return true;

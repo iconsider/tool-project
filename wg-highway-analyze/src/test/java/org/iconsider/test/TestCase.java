@@ -25,12 +25,15 @@ public class TestCase {
         List<Record> list = new ArrayList<Record>();
 
         Record r1 = new Record();
-        r1.setLasttime(1483203661000L);
+        r1.setLasttime(1506060000000L);
         Record r2 = new Record();
-        r2.setLasttime(1483290061000L);
+        r2.setLasttime(1506060900000L);
         Record r3 = new Record();
-        r3.setLasttime(1483376461000L);
+        r3.setLasttime(1506060600000L);
+        Record r4 = new Record();
+        r4.setLasttime(1506060300000L);
 
+        list.add(r4);
         list.add(r2);
         list.add(r1);
         list.add(r3);
@@ -49,9 +52,25 @@ public class TestCase {
         for (Record record : list) {
             System.out.println(record);
         }
+    }
+
+    @Test
+    public void test3() {
+        List<String> list = new ArrayList<String>();
+        list.add("a");
+        list.add("b");
+        list.add("c");
 
 
+        Set<String> tmpCgiSet = new HashSet<String>();
+        for (String cgi : list) {
+            tmpCgiSet.add(cgi);
+        }
 
-
+        if(tmpCgiSet.size() > 1) {
+            System.out.println(false);
+        } else {
+            System.out.println(true);
+        }
     }
 }
