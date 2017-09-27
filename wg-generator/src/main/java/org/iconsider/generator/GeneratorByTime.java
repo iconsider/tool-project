@@ -62,15 +62,15 @@ public class GeneratorByTime {
             r0.setHighwayName(report.getHighwayName());
             r0.setSectionName(report.getSectionName());
             r0.setDirection(report.getPositiveDirection());
-            r0.setGuest(new Random().nextInt(400) + 30);
-            r0.setSpeed(new Random().nextInt(60) + 60);
+            r0.setGuest(new Random().nextInt(300) + 100);
+            r0.setSpeed(new Random().nextInt(40) + 70 + (new Random().nextDouble()));
             Report r1 = new Report();
             r1.setTime(dateTime);
             r1.setHighwayName(report.getHighwayName());
             r1.setSectionName(report.getSectionName());
             r1.setDirection(report.getNegative_direction());
-            r1.setGuest(new Random().nextInt(400) + 30);
-            r1.setSpeed(new Random().nextInt(60) + 60);
+            r1.setGuest(new Random().nextInt(300) + 100);
+            r1.setSpeed(new Random().nextInt(40) + 70 + (new Random().nextDouble()));
 
 //            System.out.println(r0);
 //            System.out.println(r1);
@@ -105,8 +105,12 @@ public class GeneratorByTime {
     }
 
     public void insertTable(List<Report> list) {
+        //测试环境
 //        String sql = "INSERT INTO f_hx_highway_statistic_20m (start_time, highway_name, section_name, direction, guest_count, speed) VALUES (to_timestamp(?,'YYYY-MM-DD HH24:MI:SS'),?,?,?,?,?)";
-        String sql = "INSERT INTO f_hx_highway_statistic_20m (start_time, highway_name, section_name, direction, guest_count, speed) VALUES (?,?,?,?,?,?)";
+        String sql = "INSERT INTO temp_hx_highway_result2 (start_time, highway_name, section_name, direction, guest_count, speed) VALUES (?,?,?,?,?,?)";
+
+        //生产环境
+//        String sql = "INSERT INTO temp_hx_highway_result2 (start_time, highway_name, section_name, direction, guest_count, speed) VALUES (?,?,?,?,?,?)";
         JdbcTemplate template = SpringContextInstance.getBean("oracleJdbcTemplate", JdbcTemplate.class);
         for (Report r : list) {
             template.update(sql, r.getTime(), r.getHighwayName(), r.getSectionName(), r.getDirection(), r.getGuest(), r.getSpeed());
