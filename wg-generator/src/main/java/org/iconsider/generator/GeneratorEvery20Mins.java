@@ -18,7 +18,21 @@ import java.util.Random;
  */
 @Component
 public class GeneratorEvery20Mins {
+    public static String env = "unknown";
+
     public static void main(String[] args) {
+        if(args.length != 1) {
+            System.out.println("plz input args(env=test or product)");
+            return;
+        } else {
+            if("test".equals(args[0]) || "product".equals(args[0])) {
+                GeneratorEvery20Mins.env = args[0];
+            } else {
+                System.out.println("plz input args(env=test or product)");
+                return;
+            }
+        }
+
         GeneratorEvery20Mins generatorEvery20Mins = SpringContextInstance.getBean("generatorEvery20Mins", GeneratorEvery20Mins.class);
         while(true) {
             try {
@@ -57,17 +71,9 @@ public class GeneratorEvery20Mins {
             r1.setGuest(new Random().nextInt(300) + 100);
             r1.setSpeed(new Random().nextInt(40) + 70 + (new Random().nextDouble()));
 
-//            System.out.println(r0);
-//            System.out.println(r1);
-
             resultList.add(r0);
             resultList.add(r1);
         }
-
-//        for (Report report : resultList) {
-//            System.out.println(report);
-//        }
-//        System.out.println("路段数量：" + resultList.size());
 
         this.insertTable(resultList);
     }
@@ -97,8 +103,21 @@ public class GeneratorEvery20Mins {
 //        String sql = "INSERT INTO f_hx_highway_statistic_20m (start_time, highway_name, section_name, direction, guest_count, speed) VALUES (to_timestamp(?,'YYYY-MM-DD HH24:MI:SS'),?,?,?,?,?)";
 //        JdbcTemplate template = SpringContextInstance.getBean("pgJdbcTemplate", JdbcTemplate.class);
 
-        //生产环境
-        String sql = "INSERT INTO temp_hx_highway_result2 (start_time, highway_name, section_name, direction, guest_count, speed) VALUES (?,?,?,?,?,?)";
+
+        if("unknown".equals(GeneratorEvery20Mins.env)) {
+            System.out.println("env is unknown, plz input args");
+            return;
+        }
+
+        String sql = "";
+        if("product".equals(GeneratorEvery20Mins.env)) {
+            //生产环境表
+            sql = "INSERT INTO f_hx_highway_statistic_20m (start_time, highway_name, section_name, direction, guest_count, speed) VALUES (?,?,?,?,?,?)";
+        } else if("test".equals(GeneratorEvery20Mins.env)) {
+            //测试环境表
+            sql = "INSERT INTO temp_hx_highway_result2 (start_time, highway_name, section_name, direction, guest_count, speed) VALUES (?,?,?,?,?,?)";
+        }
+
         JdbcTemplate template = SpringContextInstance.getBean("oracleJdbcTemplate", JdbcTemplate.class);
 
         for (Report r : list) {

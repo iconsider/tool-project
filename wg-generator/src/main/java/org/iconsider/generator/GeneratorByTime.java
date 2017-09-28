@@ -18,18 +18,29 @@ import java.util.Random;
  */
 @Component
 public class GeneratorByTime {
+    public static String env = "unknown";
+
+
     public static void main(String[] args) throws Exception {
         if (args.length < 1) {
-            System.out.println("plz input beginTime,endTime, time format:2017-09-19 00:00:00");
+            System.out.println("plz input env and [beginTime,endTime), env format:test or product; time format:2017-09-19 00:00:00");
             return;
         }
 
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         GeneratorByTime generator = SpringContextInstance.getBean("generatorByTime", GeneratorByTime.class);
 
+        if("test".equals(args[0]) || "product".equals(args[0])) {
+            GeneratorEvery20Mins.env = args[0];
+        } else {
+            System.out.println("plz input args(env=test or product)");
+            return;
+        }
+
+
+
 //        String beginTime = "2017-09-19 00:00:00";
 //        String endTime = "2017-09-20 00:00:00";
-
         String beginTime = args[0];
         String endTime = args[1];
 
@@ -40,7 +51,6 @@ public class GeneratorByTime {
             if (beginTimestamp - endTimestamp == 0) {
                 break;
             }
-//            System.out.println(sdf.format(new Date(beginTimestamp)));
             generator.generate(sdf.format(new Date(beginTimestamp)));
             beginTimestamp = beginTimestamp + 20*60*1000L;
 
@@ -53,7 +63,6 @@ public class GeneratorByTime {
     public void generate(String dateTime) {
         System.out.println(dateTime);
         List<Report> list = this.queryForSection();
-//        System.out.println(list.size());
 
         List<Report> resultList = new ArrayList<Report>();
         for (Report report : list) {
@@ -105,12 +114,23 @@ public class GeneratorByTime {
     }
 
     public void insertTable(List<Report> list) {
-        //测试环境
-//        String sql = "INSERT INTO f_hx_highway_statistic_20m (start_time, highway_name, section_name, direction, guest_count, speed) VALUES (to_timestamp(?,'YYYY-MM-DD HH24:MI:SS'),?,?,?,?,?)";
-        String sql = "INSERT INTO temp_hx_highway_result2 (start_time, highway_name, section_name, direction, guest_count, speed) VALUES (?,?,?,?,?,?)";
+        String sql = "";
 
-        //生产环境
-//        String sql = "INSERT INTO temp_hx_highway_result2 (start_time, highway_name, section_name, direction, guest_count, speed) VALUES (?,?,?,?,?,?)";
+        if("unknown".equals(GeneratorEvery20Mins.env)) {
+            System.out.println("env is unknown, plz input args");
+            return;
+        }
+
+        if("test".equals(GeneratorEvery20Mins.env)) {
+            //测试环境
+//          sql = "INSERT INTO f_hx_highway_statistic_20m (start_time, highway_name, section_name, direction, guest_count, speed) VALUES (to_timestamp(?,'YYYY-MM-DD HH24:MI:SS'),?,?,?,?,?)";
+            sql = "INSERT INTO temp_hx_highway_result2 (start_time, highway_name, section_name, direction, guest_count, speed) VALUES (?,?,?,?,?,?)";
+        }
+        if("product".equals(GeneratorEvery20Mins.env)) {
+            //生产环境
+            sql = "INSERT INTO f_hx_highway_statistic_20m (start_time, highway_name, section_name, direction, guest_count, speed) VALUES (?,?,?,?,?,?)";
+        }
+
         JdbcTemplate template = SpringContextInstance.getBean("oracleJdbcTemplate", JdbcTemplate.class);
         for (Report r : list) {
             template.update(sql, r.getTime(), r.getHighwayName(), r.getSectionName(), r.getDirection(), r.getGuest(), r.getSpeed());
