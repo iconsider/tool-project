@@ -2,15 +2,16 @@ package org.iconsider.generator;
 
 import org.iconsider.model.Report;
 import org.iconsider.utils.SpringContextInstance;
+import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.rowset.SqlRowSet;
 import org.springframework.stereotype.Component;
 
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 
 /**
  * Created by liuzhenxing on 2017-9-21.
@@ -41,8 +42,8 @@ public class GeneratorByTime {
 
 //        String beginTime = "2017-09-19 00:00:00";
 //        String endTime = "2017-09-20 00:00:00";
-        String beginTime = args[0];
-        String endTime = args[1];
+        String beginTime = args[1];
+        String endTime = args[2];
 
         long beginTimestamp = sdf.parse(beginTime).getTime();
         long endTimestamp = sdf.parse(endTime).getTime();
@@ -71,29 +72,84 @@ public class GeneratorByTime {
             r0.setHighwayName(report.getHighwayName());
             r0.setSectionName(report.getSectionName());
             r0.setDirection(report.getPositiveDirection());
-            r0.setGuest(new Random().nextInt(300) + 100);
-            r0.setSpeed(new Random().nextInt(40) + 70 + (new Random().nextDouble()));
+            r0.setGuest(generateGuest(dateTime));
+            r0.setSpeed(new Random().nextInt(50) + 60 + (new Random().nextDouble()));
             Report r1 = new Report();
             r1.setTime(dateTime);
             r1.setHighwayName(report.getHighwayName());
             r1.setSectionName(report.getSectionName());
             r1.setDirection(report.getNegative_direction());
-            r1.setGuest(new Random().nextInt(300) + 100);
-            r1.setSpeed(new Random().nextInt(40) + 70 + (new Random().nextDouble()));
-
-//            System.out.println(r0);
-//            System.out.println(r1);
+            r1.setGuest(generateGuest(dateTime));
+            r1.setSpeed(new Random().nextInt(50) + 60 + (new Random().nextDouble()));
 
             resultList.add(r0);
             resultList.add(r1);
         }
-
-//        for (Report report : resultList) {
-//            System.out.println(report);
-//        }
-//        System.out.println("路段数量：" + resultList.size());
-
         this.insertTable(resultList);
+    }
+
+
+
+    public int generateGuest(String dateTime) {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        int guest = 100;
+        try {
+
+            Calendar calendar = Calendar.getInstance();
+            calendar.setTime(sdf.parse(dateTime));
+            int hour = calendar.get(Calendar.HOUR_OF_DAY);
+
+            switch (hour) {
+                case 0:
+                    guest = new Random().nextInt(150) + 150;
+                    break;
+                case 1:
+                    guest = new Random().nextInt(100) + 100;
+                    break;
+                case 2:
+                    guest = new Random().nextInt(100) + 100;
+                    break;
+                case 3:
+                    guest = new Random().nextInt(100) + 80;
+                    break;
+                case 4:
+                    guest = new Random().nextInt(100) + 50;
+                    break;
+                case 5:
+                    guest = new Random().nextInt(100) + 80;
+                    break;
+                case 6:
+                    guest = new Random().nextInt(100) + 100;
+                    break;
+                case 7:
+                    guest = new Random().nextInt(150) + 150;
+                    break;
+                case 8:
+                    guest = new Random().nextInt(150) + 150;
+                    break;
+                case 12:
+                    guest = new Random().nextInt(400) + 190;
+                    break;
+                case 13:
+                    guest = new Random().nextInt(400) + 190;
+                    break;
+                case 14:
+                    guest = new Random().nextInt(400) + 190;
+                    break;
+                case 15:
+                    guest = new Random().nextInt(400) + 190;
+                    break;
+                case 16:
+                    guest = new Random().nextInt(400) + 190;
+                    break;
+                default:
+                    guest = new Random().nextInt(300) + 150;
+                    break;
+            }
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+        return guest;
     }
 
     public List<Report> queryForSection() {
@@ -113,7 +169,7 @@ public class GeneratorByTime {
         return list;
     }
 
-    public void insertTable(List<Report> list) {
+    public void insertTable(final List<Report> list) {
         String sql = "";
 
         if("unknown".equals(GeneratorEvery20Mins.env)) {
@@ -132,8 +188,23 @@ public class GeneratorByTime {
         }
 
         JdbcTemplate template = SpringContextInstance.getBean("oracleJdbcTemplate", JdbcTemplate.class);
-        for (Report r : list) {
-            template.update(sql, r.getTime(), r.getHighwayName(), r.getSectionName(), r.getDirection(), r.getGuest(), r.getSpeed());
-        }
+//        for (Report r : list) {
+//            template.update(sql, r.getTime(), r.getHighwayName(), r.getSectionName(), r.getDirection(), r.getGuest(), r.getSpeed());
+//        }
+
+        template.batchUpdate(sql, new BatchPreparedStatementSetter() {
+            public void setValues(PreparedStatement ps, int i) throws SQLException {
+                Report report = list.get(i);
+                ps.setString(1, report.getTime());
+                ps.setString(2, report.getHighwayName());
+                ps.setString(3, report.getSectionName());
+                ps.setString(4, report.getDirection());
+                ps.setInt(5, report.getGuest());
+                ps.setDouble(6, report.getSpeed());
+            }
+            public int getBatchSize() {
+                return list.size();
+            }
+        });
     }
 }
