@@ -138,6 +138,12 @@ public class MyJob implements Serializable {
         System.out.println("---------------------");
     }
 
+    private void showUserRecord(List<Record> userRecordList) {
+        for (Record record : userRecordList) {
+            System.out.println(record);
+        }
+    }
+
 
     /**
      * 根据用户的快照记录，判断用户属于哪条高速。
@@ -184,7 +190,6 @@ public class MyJob implements Serializable {
         if (value == userRecordList.size()) {
             return key;
         } else {
-            System.out.println(String.format("%s != %s",value,userRecordList.size()));
             return -2;
         }
     }
@@ -213,7 +218,8 @@ public class MyJob implements Serializable {
 
 
     /**
-     * 传入单个用户的所有快照记录（最多4条），计算单个用户运行信息
+     * 计算单个用户运行信息:
+     * 传入单个用户的所有快照记录（最多4条），
      */
     private List<UserReport> userAnalyze(List<Record> userRecordList) {
         int highwayId = 0;
@@ -230,8 +236,8 @@ public class MyJob implements Serializable {
             //把单个用户的快照记录（最多4条）按lasttime排序
             Collections.sort(userRecordList, new Comparator<Record>() {
                 public int compare(Record o1, Record o2) {
-                    long startTime1 = o1.getStartTimeStamp();
-                    long startTime2 = o2.getStartTimeStamp();
+                    long startTime1 = o1.getLasttime();
+                    long startTime2 = o2.getLasttime();
                     if(startTime1 > startTime2) {
                         return 1;
                     } else if(startTime1 < startTime2) {
@@ -244,14 +250,13 @@ public class MyJob implements Serializable {
             //判断用户是否跨高速
             int belongToHighwayId = belongToWhichHighway(userRecordList);
             if(belongToHighwayId < 0) {     //belongToHighwayId可能是-1（表示没有该高速id），-2（表示跨高速，跨高速无法计算运行距离）
-                System.out.println("用户跨高速");
+//                System.out.println("用户跨高速");
                 return new ArrayList<UserReport>(); //返回空的list
             }
 
             //sectionId
             Set<Integer> sectionSet = new HashSet<>();
             for (Record record : userRecordList) {
-                System.out.println(record);
                 Cell cellTemp = getSectionInfo(record.getCgi(), belongToHighwayId);
                 int s = cellTemp.getSectionId();
                 sectionSet.add(s);
@@ -274,11 +279,11 @@ public class MyJob implements Serializable {
             //运行时间
             long beginTime = userRecordList.get(0).getLasttime();
             long endTime = userRecordList.get(userRecordList.size()-1).getLasttime();
-            double runTime = (endTime - beginTime) / 1000D / 60D / 60D;
+            double runTime = endTime - beginTime;
 
             //运行距离
-            Set<Integer> cellIdSet = new HashSet<Integer>();
             double distance = 0D;
+            Set<Integer> cellIdSet = new HashSet<Integer>();
             for (Record record : userRecordList) {
                 cellIdSet.add(getSectionInfo(record.getCgi(), highwayId).getCellId());
             }
@@ -297,7 +302,9 @@ public class MyJob implements Serializable {
             boolean isPossible = true;
             if(runTime <= 0D) {
                 isPossible = false;
+                showUserRecord(userRecordList);
                 System.out.println(String.format("运行时间不合理，runTime=%s h", runTime));
+                System.out.println("---------------");
             }
             if(distance <= 0D) {
                 isPossible = false;
@@ -310,11 +317,10 @@ public class MyJob implements Serializable {
                     list.add(new UserReport(highwayId, sectionIdTemp, direction, distance, runTime));
                 }
 
-                System.out.println(String.format("合理，distance:%s, runtime:%s, speed:%s",distance,runTime,(distance/1000D)/(runTime/1000D/60D/60D)));
+                System.out.println(String.format("合理，distance:%sm, runtime:%sms, speed:%skm/h",distance,runTime,(distance/1000D)/(runTime/1000D/60D/60D)));
 
                 return list;
             } else {
-                System.out.println("myflag:impossible");
                 return new ArrayList<UserReport>(); //返回空的list
             }
 
