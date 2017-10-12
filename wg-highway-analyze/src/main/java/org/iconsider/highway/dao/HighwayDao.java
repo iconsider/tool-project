@@ -15,10 +15,10 @@ import java.util.*;
  * Created by liuzhenxing on 2017-9-25.
  */
 public class HighwayDao {
-    public Map<String, Cell> getAllCell() {
+    public Map<String, List<Cell>> getAllCell() {
         ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("applicationContext.xml");
         JdbcTemplate jdbcTemple = context.getBean("postgresJdbcTemplate", JdbcTemplate.class);
-        Map<String, Cell> map = new HashMap<String, Cell>();
+        Map<String, List<Cell>> map = new HashMap<>();
 
         String sql = "select cell_id,cell_name,highway_id,highway_name,section_id,section_name,positive_direction,negative_direction,distance,cgi from d_hx_highway_cell";
         SqlRowSet rs = jdbcTemple.queryForRowSet(sql);
@@ -34,8 +34,24 @@ public class HighwayDao {
             double distance = rs.getDouble("distance");
             String cgi = rs.getString("cgi");
 
-            map.put(cgi, new Cell(cellId,cellName,highwayId,highwayName,sectionId,sectionName,postiveDirection,negative_direction,distance,cgi));
-
+            if (map.get(cgi) == null) {
+                List<Cell> listTemp = new ArrayList<>();
+                Cell cellTemp = new Cell(cellId,cellName,highwayId,highwayName,sectionId,sectionName,postiveDirection,negative_direction,distance,cgi);
+                listTemp.add(cellTemp);
+                map.put(cgi, listTemp);
+            } else {
+                boolean isExist = false; //判断是否存在一个highwayId、sectionId和新加highwayId、sectionId一样的Cell
+                List<Cell> listTemp = map.get(cgi);
+                for (Cell cell : listTemp) {
+                    if (cell.getHighwayId() == highwayId && cell.getSectionId() == sectionId) {
+                        isExist = true;
+                        break;
+                    }
+                }
+                if (!isExist) {     //容器不存在highwayId、sectionId和准备新加cell一样的highwayId、sectionId，才把该cell添加
+                    listTemp.add(new Cell(cellId, cellName, highwayId, highwayName, sectionId, sectionName, postiveDirection, negative_direction, distance, cgi));
+                }
+            }
         }
         return map;
     }
@@ -94,14 +110,20 @@ public class HighwayDao {
 
     public static void main(String[] args) {
         HighwayDao dao = new HighwayDao();
-//        Map<String, Cell> map = dao.getAllCell();
-//        System.out.println(map.get("10411-1326"));
+        Map<String, List<Cell>> map = dao.getAllCell();
+
+        Iterator<Map.Entry<String, List<Cell>>> it = map.entrySet().iterator();
+        int count = 0;
+        while (it.hasNext()) {
+            Map.Entry<String, List<Cell>> entry = it.next();
+            if (entry.getValue().size() >= 2) {
+                System.out.println(String.format("key:%s, value:%s", entry.getKey(), entry.getValue().size()));
+                count++;
+            }
+        }
+
+        System.out.println(String.format("more than 2: %s", count));
 
 
-//        System.out.println(dao.getSectionIdByCgi("657635-11"));
-//        System.out.println(dao.getDistanceByCellId(2066,2116));
-        Map<Integer, Double> map = dao.getCellDistance();
-        System.out.println(map.size());
-        System.out.println(map.get(100));
     }
 }

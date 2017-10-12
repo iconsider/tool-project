@@ -7,17 +7,27 @@ import java.io.Serializable;
  */
 public class UserReport implements Serializable {
     private static final long serialVersionUID = 2790936357289775224L;
-    private String sectionId;
+    private int highwayId;
+    private int sectionId;
     private String direction;
     private double distance;
-    private double time;  //hour
+    private double time;
     private double speed;
 
-    public String getSectionId() {
+
+    public int getHighwayId() {
+        return highwayId;
+    }
+
+    public void setHighwayId(int highwayId) {
+        this.highwayId = highwayId;
+    }
+
+    public int getSectionId() {
         return sectionId;
     }
 
-    public void setSectionId(String sectionId) {
+    public void setSectionId(int sectionId) {
         this.sectionId = sectionId;
     }
 
@@ -53,18 +63,19 @@ public class UserReport implements Serializable {
         this.speed = speed;
     }
 
-    public UserReport(String sectionId, String direction, double distance, double time) {
+    public UserReport(int highwayId, int sectionId, String direction, double distance, double time) {
+        this.highwayId = highwayId;
         this.sectionId = sectionId;
         this.direction = direction;
         this.distance = distance;
         this.time = time;
     }
 
-
     @Override
     public String toString() {
         return "UserReport{" +
-                "sectionId='" + sectionId + '\'' +
+                "highwayName='" + highwayId + '\'' +
+                ", sectionName='" + sectionId + '\'' +
                 ", direction='" + direction + '\'' +
                 ", distance=" + String.format("%.2f",distance) +
                 ", time=" + String.format("%.2f",time) +

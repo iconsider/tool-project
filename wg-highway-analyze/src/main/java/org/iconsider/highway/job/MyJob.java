@@ -1,25 +1,32 @@
 package org.iconsider.highway.job;
 
+import org.apache.avro.generic.GenericData;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.*;
+import org.datanucleus.store.types.backed.*;
 import org.iconsider.highway.dao.HighwayDao;
-import org.iconsider.highway.model.Cell;
-import org.iconsider.highway.model.Record;
-import org.iconsider.highway.model.UserReport;
+import org.iconsider.highway.model.*;
 import scala.Tuple2;
 
 import java.io.Serializable;
 import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Created by liuzhenxing on 2017-9-23.
  */
 public class MyJob implements Serializable {
     private static final long serialVersionUID = 1546386160228769866L;
-    Map<String, Cell> cgiCellMap = null;  //key,value -> cgi,cell
+    Map<String, List<Cell>> cgiCellMap = null;  //key,value -> cgi,cell
     Map<Integer, Double> cellIdDistanceMap = null;  //key,value -> cellId,distance
+    Map<String, List<String>> sectionIdMsisdnMap = null;    //key,value -> sectionId,msisdnList
 
     public void execute(SparkConf conf) {
         this.task0(conf);
@@ -28,12 +35,13 @@ public class MyJob implements Serializable {
 
     public void task0(SparkConf sparkConf) {
         JavaSparkContext javaSparkContext = new JavaSparkContext(sparkConf);
-//        JavaRDD<String> fiveMinRecordRDD = javaSparkContext.textFile("hdfs://host1:9000/user/hanxinnil/highwayInfo/201709221400");
-        JavaRDD<String> fiveMinRecordRDD = javaSparkContext.textFile("hdfs://host1:9000/user/hanxinnil/highwayInfo/201709221420");
+        JavaRDD<String> fiveMinRecordRDD = javaSparkContext.textFile("hdfs://host1:9000/user/hanxinnil/highwayInfo/201709221400");
+//        JavaRDD<String> fiveMinRecordRDD = javaSparkContext.textFile("hdfs://host1:9000/user/hanxinnil/highwayInfo/201709221420");
 //        JavaRDD<String> fiveMinRecordRDD = javaSparkContext.textFile("hdfs://host1:9000/user/hanxinnil/highwayInfo/201709221440");
+//        JavaRDD<String> fiveMinRecordRDD = javaSparkContext.textFile("hdfs://host1:9000/user/hanxinnil/highwayInfo/201709290200");
 
 
-        fiveMinRecordRDD.mapPartitionsToPair(new PairFlatMapFunction<Iterator<String>, String, List<Record>>() {
+        int a = fiveMinRecordRDD.mapPartitionsToPair(new PairFlatMapFunction<Iterator<String>, String, List<Record>>() {
             public Iterable<Tuple2<String, List<Record>>> call(Iterator<String> lines) throws Exception {
                 List<Tuple2<String, List<Record>>> list = new ArrayList<Tuple2<String, List<Record>>>();
 
@@ -50,7 +58,7 @@ public class MyJob implements Serializable {
                     } else if (!residentUserSet.contains(record.getMsisdn())) {  //TODO，加上！
                         List<Record> tmp = new ArrayList<Record>();
                         tmp.add(record);
-                        list.add(new Tuple2<String, List<Record>>(record.getMsisdn(), tmp));
+                        list.add(new Tuple2<>(record.getMsisdn(), tmp));
                     }
                 }
                 return list;
@@ -64,60 +72,299 @@ public class MyJob implements Serializable {
             public Boolean call(Tuple2<String, List<Record>> tuple) throws Exception {
                 if (tuple._2.size() <= 1 || tuple._1.length() != 11) {  //过滤用户记录cgi小于等于1，电话号码长度不是11位
                     return false;
-                } else if (isAllCgiSame(tuple._2)) {
+                } else if(isAllCgiSame(tuple._2)) { //TODO，删除isAllCgiSame()方法
                     return false;
                 } else {
                     return true;
                 }
             }
-        }).mapToPair(new PairFunction<Tuple2<String, List<Record>>, Integer, Integer>() {
-            public Tuple2<Integer, Integer> call(Tuple2<String, List<Record>> tuple2) throws Exception {
-                UserReport userReport = userAnalyze(tuple2._2);
-                int speed = (int) ((userReport.getDistance()/1000)/(userReport.getTime()/60));
+        }).flatMap(new FlatMapFunction<Tuple2<String, List<Record>>, Tuple2<String, List<UserReport>>>() {
+            @Override
+            public Iterable<Tuple2<String, List<UserReport>>> call(Tuple2<String, List<Record>> tuple2) throws Exception {
+                List<UserReport> userReportList = userAnalyze(tuple2._2);
+                List<Tuple2<String, List<UserReport>>> t = new ArrayList<>();   //tuple2 -> key:sectionId:directon, value:userReport
 
-                return new Tuple2<Integer, Integer>(speed/10, 1);
+                for (UserReport ur : userReportList) {
+                    List<UserReport> listTemp = new ArrayList<>();
+                    listTemp.add(ur);
+                    Tuple2<String, List<UserReport>> tuplt2Temp = new Tuple2<String, List<UserReport>>(String.format("%s:%s", ur.getSectionId(), ur.getDirection()), listTemp);
+                    t.add(tuplt2Temp);
+                }
+                return t;
             }
-        }).reduceByKey(new Function2<Integer, Integer, Integer>() {
-            public Integer call(Integer integer, Integer integer2) throws Exception {
-                return integer+integer2;
+        }).mapToPair(new PairFunction<Tuple2<String, List<UserReport>>, String, UserReport>() {
+            @Override
+            public Tuple2<String, UserReport> call(Tuple2<String, List<UserReport>> tuple2) throws Exception {
+                Tuple2<String, UserReport> t = new Tuple2<String, UserReport>(tuple2._1, tuple2._2.get(0));
+                return t;
             }
-        }).foreach(new VoidFunction<Tuple2<Integer, Integer>>() {
-            public void call(Tuple2<Integer, Integer> tuple2) throws Exception {
-                System.out.println(String.format("speed:%04d, number:%s", tuple2._1, tuple2._2));
-            }
-        });
+        }).collect().size();
 
+        System.out.println("size:" + a);
+
+
+//                .mapToPair(new PairFunction<Tuple2<String, List<Record>>, String, List<UserReport>>() {
+//            public Tuple2<String, List<UserReport>> call(Tuple2<String, List<Record>> tuple2) throws Exception {
+//                List<UserReport> userReportList = userAnalyze(tuple2._2);
+//                return new Tuple2<>(String.format("%s:%s", userReport.getSectionId(), userReport.getDirection()), list);
+//            }
+//        });
+
+
+
+//                .reduceByKey(new Function2<List<UserReport>, List<UserReport>, List<UserReport>>() {
+//            public List<UserReport> call(List<UserReport> list1, List<UserReport> list2) throws Exception {
+//                list1.addAll(list2);
+//                return list1;
+//            }
+//        }).map(new Function<Tuple2<String,List<UserReport>>, SectionReport>() {
+//            public SectionReport call(Tuple2<String, List<UserReport>> tuple2) throws Exception {
+//                return sectionAnalyze(tuple2._2);
+//            }
+//        }).foreach(new VoidFunction<SectionReport>() {
+//            public void call(SectionReport sectionReport) throws Exception {
+//                System.out.println(sectionReport);
+//            }
+//        });
 
 
     }
 
 
-    public UserReport userAnalyze(List<Record> userRecordList) {
-        if(null == cgiCellMap) {
-            HighwayDao dao = new HighwayDao();
-            cgiCellMap = dao.getAllCell();
+    private void show4Record(Tuple2<String, List<Record>> tuple2) {
+        for (Record record : tuple2._2) {
+            System.out.println(record);
         }
-        if(null == cellIdDistanceMap) {
-            HighwayDao dao = new HighwayDao();
-            cellIdDistanceMap = dao.getCellDistance();
-        }
+        System.out.println("---------------------");
+    }
 
-        double time = ((userRecordList.size()) * 5);
 
-        Set<Integer> cellIdSet = new HashSet<Integer>();
-        double distance = 0D;
+    /**
+     * 根据用户的快照记录，判断用户属于哪条高速。
+     *
+     * 用户快照记录的cgi可能会属于多条高速的路段
+     * 如果用户有4条记录，第一条记录的cgi查询得到属于高速1和高速2
+     * 第二、三、四条记录属于高速2，
+     * 属于高速2的数量多，则用户属于高速2
+     *
+     * 如果出现跨高速，则返回-2
+     * 判断跨高速条件：
+     * 存在一个高速id出现次数等于该用户快照记录的条数，则该用户没有跨高速
+     * 否则用户为跨高速
+     */
+    private int belongToWhichHighway(List<Record> userRecordList) {
+        Map<String, Integer> highwayIdNumberMap = new HashMap<>();  //key->"highwayId:sectionId", value->次数
         for (Record record : userRecordList) {
-            cellIdSet.add(cgiCellMap.get(record.getCgi()).getCellId());
-        }
-        int minCellId = Collections.min(cellIdSet);
-        int maxCellId = Collections.max(cellIdSet);
-        if (maxCellId - minCellId < 152) {
-            for (int i = minCellId; i < maxCellId; i++) {
-                distance += cellIdDistanceMap.get(i);
+            List<Cell> listTemp = cgiCellMap.get(record.getCgi());
+            for (Cell cell : listTemp) {
+                String highwayId = String.valueOf(cell.getHighwayId());
+                String sectionId = String.valueOf(cell.getSectionId());
+                String keyTemp = String.format("%s:%s",highwayId,sectionId);
+                if (null == highwayIdNumberMap.get(keyTemp)) {
+                    highwayIdNumberMap.put(keyTemp, 1);
+                } else {
+                    int num = highwayIdNumberMap.get(keyTemp) + 1;
+                    highwayIdNumberMap.put(keyTemp, num);
+                }
             }
         }
 
-        return new UserReport("unknown_sectionId", "unknown_direction", distance, time);
+        int key = -1;       //highwayId
+        int value = -1;     //highwayId 出现的次数
+        Iterator<Map.Entry<String, Integer>> it = highwayIdNumberMap.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<String, Integer> entry = it.next();
+            if (entry.getValue() >= value) {
+                key = Integer.valueOf(entry.getKey().split(":")[0]);
+                value = entry.getValue();
+            }
+        }
+
+        //判断是否跨高速
+        if (value == userRecordList.size()) {
+            return key;
+        } else {
+            System.out.println(String.format("%s != %s",value,userRecordList.size()));
+            return -2;
+        }
+    }
+
+
+    /**
+     * 当cgi反向查询有多条section信息时，用cgi和highwayId获取section信息（前提该用户没有跨高速）
+     *
+     */
+    private Cell getSectionInfo(String cgi, int highwayId) {
+        List<Cell> listTemp = cgiCellMap.get(cgi);
+        if (null == listTemp) {
+            System.out.println(String.format("cgiCellMap hasn't cgi: %s", cgi));
+            return null;
+        } else {
+            for (Cell cell : listTemp) {
+                if (highwayId == cell.getHighwayId()) {
+                    return cell;
+                }
+            }
+        }
+        System.out.println(String.format("用cgi从cgiCellMap查出的sectionInfo，没有包含该highwayId的记录：highwayId: %s, cgi:%s", highwayId, cgi));
+        return null;
+    }
+
+
+
+    /**
+     * 传入单个用户的所有快照记录（最多4条），计算单个用户运行信息
+     */
+    private List<UserReport> userAnalyze(List<Record> userRecordList) {
+        int highwayId = 0;
+        if (userRecordList != null && userRecordList.size() > 1) {
+            if(null == cgiCellMap) {
+                HighwayDao dao = new HighwayDao();
+                cgiCellMap = dao.getAllCell();
+            }
+            if(null == cellIdDistanceMap) {
+                HighwayDao dao = new HighwayDao();
+                cellIdDistanceMap = dao.getCellDistance();
+            }
+
+            //把单个用户的快照记录（最多4条）按lasttime排序
+            Collections.sort(userRecordList, new Comparator<Record>() {
+                public int compare(Record o1, Record o2) {
+                    long startTime1 = o1.getStartTimeStamp();
+                    long startTime2 = o2.getStartTimeStamp();
+                    if(startTime1 > startTime2) {
+                        return 1;
+                    } else if(startTime1 < startTime2) {
+                        return -1;
+                    }
+                    return 0;
+                }
+            });
+
+            //判断用户是否跨高速
+            int belongToHighwayId = belongToWhichHighway(userRecordList);
+            if(belongToHighwayId < 0) {     //belongToHighwayId可能是-1（表示没有该高速id），-2（表示跨高速，跨高速无法计算运行距离）
+                System.out.println("用户跨高速");
+                return new ArrayList<UserReport>(); //返回空的list
+            }
+
+            //sectionId
+            Set<Integer> sectionSet = new HashSet<>();
+            for (Record record : userRecordList) {
+                System.out.println(record);
+                Cell cellTemp = getSectionInfo(record.getCgi(), belongToHighwayId);
+                int s = cellTemp.getSectionId();
+                sectionSet.add(s);
+            }
+
+            //highwayId
+            highwayId = belongToHighwayId;
+
+            //运行方向
+            String direction = "firstCell=lastCell";
+            Cell firstCell = getSectionInfo(userRecordList.get(0).getCgi(), highwayId);
+            Cell lastCell = getSectionInfo(userRecordList.get(userRecordList.size()-1).getCgi(), highwayId);
+            if(firstCell.getCellId() > lastCell.getCellId()) {
+                direction = firstCell.getPostiveDirection();
+            }
+            if(firstCell.getCellId() < lastCell.getCellId()) {
+                direction = firstCell.getNegativeDirection();
+            }
+
+            //运行时间
+            long beginTime = userRecordList.get(0).getLasttime();
+            long endTime = userRecordList.get(userRecordList.size()-1).getLasttime();
+            double runTime = (endTime - beginTime) / 1000D / 60D / 60D;
+
+            //运行距离
+            Set<Integer> cellIdSet = new HashSet<Integer>();
+            double distance = 0D;
+            for (Record record : userRecordList) {
+                cellIdSet.add(getSectionInfo(record.getCgi(), highwayId).getCellId());
+            }
+            int minCellId = Collections.min(cellIdSet);
+            int maxCellId = Collections.max(cellIdSet);
+            if (maxCellId - minCellId < 152) {
+                for (int i = minCellId; i < maxCellId; i++) {
+                    distance += cellIdDistanceMap.get(i);
+                }
+            } else {
+                System.out.println("error: maxCellId - minCellId > 152");
+            }
+
+
+            //检查各种运行信息是否合理
+            boolean isPossible = true;
+            if(runTime <= 0D) {
+                isPossible = false;
+                System.out.println(String.format("运行时间不合理，runTime=%s h", runTime));
+            }
+            if(distance <= 0D) {
+                isPossible = false;
+                System.out.println(String.format("运行距离不合理，distance=%s h", distance));
+            }
+
+            if(isPossible) {
+                List<UserReport> list = new ArrayList<>();
+                for (Integer sectionIdTemp : sectionSet) {
+                    list.add(new UserReport(highwayId, sectionIdTemp, direction, distance, runTime));
+                }
+
+                System.out.println(String.format("合理，distance:%s, runtime:%s, speed:%s",distance,runTime,(distance/1000D)/(runTime/1000D/60D/60D)));
+
+                return list;
+            } else {
+                System.out.println("myflag:impossible");
+                return new ArrayList<UserReport>(); //返回空的list
+            }
+
+
+        } else {
+            System.out.println("UserReport is null");
+            return new ArrayList<UserReport>(); //返回空的list
+        }
+    }
+
+
+    private SectionReport sectionAnalyze(List<UserReport> userReportList) {
+        int highwayId = 0;
+        int sectonId = 0;
+        if (userReportList != null && userReportList.size() > 0) {
+            if(null == cgiCellMap) {
+                HighwayDao dao = new HighwayDao();
+                cgiCellMap = dao.getAllCell();
+            }
+            if(null == cellIdDistanceMap) {
+                HighwayDao dao = new HighwayDao();
+                cellIdDistanceMap = dao.getCellDistance();
+            }
+
+            UserReport userReport = userReportList.get(0);
+            highwayId = userReport.getHighwayId();
+            sectonId = userReport.getSectionId();
+            String direction = userReport.getDirection();
+            int guestCounter = userReportList.size();
+
+            double sumSpeed = 0D;
+            int sumGuestCounter = 0;
+            for (UserReport report : userReportList) {
+                double userSpeed = report.getDistance()/report.getTime();
+                if(userSpeed > 50 && userSpeed < 120) {
+                    sumSpeed += userSpeed;
+                    sumGuestCounter++;
+                }
+            }
+            double speed = sumSpeed/sumGuestCounter;
+
+            if(Double.isNaN(speed)) {
+                speed = 120D;
+            }
+
+            return new SectionReport("notSet", highwayId, sectonId, direction, guestCounter, speed);
+        } else {
+            return new SectionReport("null", highwayId, sectonId, "null", 0, 0D);
+        }
+
     }
 
 
@@ -150,8 +397,8 @@ public class MyJob implements Serializable {
             cgiCellMap = dao.getAllCell();
         }
 
-        int beginSectionId = cgiCellMap.get(beginCgi).getSectionId();
-        int endSectionId = cgiCellMap.get(endCgi).getSectionId();
+        int beginSectionId = cgiCellMap.get(beginCgi).get(0).getSectionId();
+        int endSectionId = cgiCellMap.get(endCgi).get(0).getSectionId();
 
         if(beginSectionId == endSectionId) {
             return true;
