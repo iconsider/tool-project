@@ -41,7 +41,7 @@ public class MyJob implements Serializable {
 //        JavaRDD<String> fiveMinRecordRDD = javaSparkContext.textFile("hdfs://host1:9000/user/hanxinnil/highwayInfo/201709290200");
 
 
-        int a = fiveMinRecordRDD.mapPartitionsToPair(new PairFlatMapFunction<Iterator<String>, String, List<Record>>() {
+        fiveMinRecordRDD.mapPartitionsToPair(new PairFlatMapFunction<Iterator<String>, String, List<Record>>() {
             public Iterable<Tuple2<String, List<Record>>> call(Iterator<String> lines) throws Exception {
                 List<Tuple2<String, List<Record>>> list = new ArrayList<Tuple2<String, List<Record>>>();
 
@@ -81,7 +81,7 @@ public class MyJob implements Serializable {
         }).flatMap(new FlatMapFunction<Tuple2<String, List<Record>>, Tuple2<String, List<UserReport>>>() {
             @Override
             public Iterable<Tuple2<String, List<UserReport>>> call(Tuple2<String, List<Record>> tuple2) throws Exception {
-                List<UserReport> userReportList = userAnalyze(tuple2._2);
+                List<UserReport> userReportList = userAnalyze(tuple2._2);       //userReportList会有多条，因为存在同一高速跨路段的情况
                 List<Tuple2<String, List<UserReport>>> t = new ArrayList<>();   //tuple2 -> key:sectionId:directon, value:userReport
 
                 for (UserReport ur : userReportList) {
@@ -92,41 +92,27 @@ public class MyJob implements Serializable {
                 }
                 return t;
             }
-        }).mapToPair(new PairFunction<Tuple2<String, List<UserReport>>, String, UserReport>() {
+        }).mapToPair(new PairFunction<Tuple2<String, List<UserReport>>, String, List<UserReport>>() {
             @Override
-            public Tuple2<String, UserReport> call(Tuple2<String, List<UserReport>> tuple2) throws Exception {
-                Tuple2<String, UserReport> t = new Tuple2<String, UserReport>(tuple2._1, tuple2._2.get(0));
+            public Tuple2<String, List<UserReport>> call(Tuple2<String, List<UserReport>> tuple2) throws Exception {
+                Tuple2<String, List<UserReport>> t = new Tuple2<String, List<UserReport>>(tuple2._1, tuple2._2);
                 return t;
             }
-        }).collect().size();
-
-        System.out.println("size:" + a);
-
-
-//                .mapToPair(new PairFunction<Tuple2<String, List<Record>>, String, List<UserReport>>() {
-//            public Tuple2<String, List<UserReport>> call(Tuple2<String, List<Record>> tuple2) throws Exception {
-//                List<UserReport> userReportList = userAnalyze(tuple2._2);
-//                return new Tuple2<>(String.format("%s:%s", userReport.getSectionId(), userReport.getDirection()), list);
-//            }
-//        });
-
-
-
-//                .reduceByKey(new Function2<List<UserReport>, List<UserReport>, List<UserReport>>() {
-//            public List<UserReport> call(List<UserReport> list1, List<UserReport> list2) throws Exception {
-//                list1.addAll(list2);
-//                return list1;
-//            }
-//        }).map(new Function<Tuple2<String,List<UserReport>>, SectionReport>() {
-//            public SectionReport call(Tuple2<String, List<UserReport>> tuple2) throws Exception {
-//                return sectionAnalyze(tuple2._2);
-//            }
-//        }).foreach(new VoidFunction<SectionReport>() {
-//            public void call(SectionReport sectionReport) throws Exception {
-//                System.out.println(sectionReport);
-//            }
-//        });
-
+        }).reduceByKey(new Function2<List<UserReport>, List<UserReport>, List<UserReport>>() {
+            @Override
+            public List<UserReport> call(List<UserReport> list1, List<UserReport> list2) throws Exception {
+                list1.addAll(list2);
+                return list1;
+            }
+        }).map(new Function<Tuple2<String,List<UserReport>>, SectionReport>() {
+            public SectionReport call(Tuple2<String, List<UserReport>> tuple2) throws Exception {  //key:sectionId:directon, value:userReport
+                return sectionAnalyze(tuple2._2);
+            }
+        }).foreach(new VoidFunction<SectionReport>() {
+            public void call(SectionReport sectionReport) throws Exception {
+                System.out.println(sectionReport);
+            }
+        });
 
     }
 
@@ -269,7 +255,7 @@ public class MyJob implements Serializable {
             String direction = "firstCell=lastCell";
             Cell firstCell = getSectionInfo(userRecordList.get(0).getCgi(), highwayId);
             Cell lastCell = getSectionInfo(userRecordList.get(userRecordList.size()-1).getCgi(), highwayId);
-            if(firstCell.getCellId() > lastCell.getCellId()) {
+            if(firstCell.getCellId() >= lastCell.getCellId()) {     //TODO,为什么会有firstCell=lastCell
                 direction = firstCell.getPostiveDirection();
             }
             if(firstCell.getCellId() < lastCell.getCellId()) {
@@ -317,8 +303,7 @@ public class MyJob implements Serializable {
                     list.add(new UserReport(highwayId, sectionIdTemp, direction, distance, runTime));
                 }
 
-                System.out.println(String.format("合理，distance:%sm, runtime:%sms, speed:%skm/h",distance,runTime,(distance/1000D)/(runTime/1000D/60D/60D)));
-
+//                System.out.println(String.format("用户号码: %s, 运行距离: %.2fm, 运行时间: %.2fmin, 运行速度: %.2fkm/h",userRecordList.get(0).getMsisdn(), distance,runTime/1000D/60D,(distance/1000D)/(runTime/1000D/60D/60D)));
                 return list;
             } else {
                 return new ArrayList<UserReport>(); //返回空的list
@@ -346,31 +331,38 @@ public class MyJob implements Serializable {
             }
 
             UserReport userReport = userReportList.get(0);
+
+            //高速id
             highwayId = userReport.getHighwayId();
+
+            //路段id
             sectonId = userReport.getSectionId();
+
+            //运行方向
             String direction = userReport.getDirection();
+
+            //路段人数
             int guestCounter = userReportList.size();
 
+            //路段平均速度
             double sumSpeed = 0D;
             int sumGuestCounter = 0;
             for (UserReport report : userReportList) {
-                double userSpeed = report.getDistance()/report.getTime();
-                if(userSpeed > 50 && userSpeed < 120) {
+                double userSpeed = (report.getDistance()/1000D)/(report.getTime()/1000D/60D/60D);
+                if(userSpeed >= 0D && userSpeed <= 120D) {
                     sumSpeed += userSpeed;
+                    sumGuestCounter++;
+                } else if (userSpeed <= 180D) {
+                    sumSpeed += 120D;
                     sumGuestCounter++;
                 }
             }
             double speed = sumSpeed/sumGuestCounter;
 
-            if(Double.isNaN(speed)) {
-                speed = 120D;
-            }
-
             return new SectionReport("notSet", highwayId, sectonId, direction, guestCounter, speed);
         } else {
             return new SectionReport("null", highwayId, sectonId, "null", 0, 0D);
         }
-
     }
 
 

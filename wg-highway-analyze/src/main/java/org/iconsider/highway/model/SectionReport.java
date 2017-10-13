@@ -20,6 +20,22 @@ public class SectionReport {
         this.startTime = startTime;
     }
 
+    public int getHighwayId() {
+        return highwayId;
+    }
+
+    public void setHighwayId(int highwayId) {
+        this.highwayId = highwayId;
+    }
+
+    public int getSectionId() {
+        return sectionId;
+    }
+
+    public void setSectionId(int sectionId) {
+        this.sectionId = sectionId;
+    }
+
     public String getDirection() {
         return direction;
     }
@@ -44,23 +60,6 @@ public class SectionReport {
         this.speed = speed;
     }
 
-    public int getHighwayId() {
-        return highwayId;
-    }
-
-    public void setHighwayId(int highwayId) {
-        this.highwayId = highwayId;
-    }
-
-    public int getSectionId() {
-        return sectionId;
-    }
-
-    public void setSectionId(int sectionId) {
-        this.sectionId = sectionId;
-    }
-
-
     public SectionReport(String startTime, int highwayId, int sectionId, String direction, int guestCounter, double speed) {
         this.startTime = startTime;
         this.highwayId = highwayId;
@@ -74,11 +73,11 @@ public class SectionReport {
     public String toString() {
         return "SectionReport{" +
                 "startTime='" + startTime + '\'' +
+                ", highwayId=" + highwayId +
+                ", sectionId=" + sectionId +
                 ", direction='" + direction + '\'' +
                 ", guestCounter=" + guestCounter +
                 ", speed=" + speed +
-                ", highwayId=" + highwayId +
-                ", sectionId=" + sectionId +
                 '}';
     }
 }
