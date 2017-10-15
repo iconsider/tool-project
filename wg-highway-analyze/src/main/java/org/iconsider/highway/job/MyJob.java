@@ -55,7 +55,7 @@ public class MyJob implements Serializable {
                     Record record = new Record(lines.next());
                     if ("unknown".equals(record.getMsisdn())) {
                         continue;
-                    } else if (!residentUserSet.contains(record.getMsisdn())) {  //TODO，加上！
+                    } else if (!residentUserSet.contains(record.getMsisdn())) {
                         List<Record> tmp = new ArrayList<Record>();
                         tmp.add(record);
                         list.add(new Tuple2<>(record.getMsisdn(), tmp));
@@ -294,7 +294,7 @@ public class MyJob implements Serializable {
             }
             if(distance <= 0D) {
                 isPossible = false;
-                System.out.println(String.format("运行距离不合理，distance=%s h", distance));
+                System.out.println(String.format("运行距离不合理，distance=%s m", distance));
             }
 
             if(isPossible) {
