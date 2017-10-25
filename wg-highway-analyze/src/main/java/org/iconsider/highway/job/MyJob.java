@@ -36,8 +36,6 @@ public class MyJob implements Serializable {
     public void task0(SparkConf sparkConf) {
         JavaSparkContext javaSparkContext = new JavaSparkContext(sparkConf);
         JavaRDD<String> fiveMinRecordRDD = javaSparkContext.textFile("hdfs://host1:9000/user/hanxinnil/highwayInfo/201709221400");
-//        JavaRDD<String> fiveMinRecordRDD = javaSparkContext.textFile("hdfs://host1:9000/user/hanxinnil/highwayInfo/201709221420");
-//        JavaRDD<String> fiveMinRecordRDD = javaSparkContext.textFile("hdfs://host1:9000/user/hanxinnil/highwayInfo/201709221440");
 //        JavaRDD<String> fiveMinRecordRDD = javaSparkContext.textFile("hdfs://host1:9000/user/hanxinnil/highwayInfo/201709290200");
 
 
@@ -110,7 +108,7 @@ public class MyJob implements Serializable {
             }
         }).foreach(new VoidFunction<SectionReport>() {
             public void call(SectionReport sectionReport) throws Exception {
-                System.out.println(sectionReport);
+                System.out.println(String.format("sectionId:%s, highwayId:%s, direction:%s, guest:%s, speed:%.2f", sectionReport.getSectionId(), sectionReport.getHighwayId(), sectionReport.getDirection(), sectionReport.getGuestCounter(), sectionReport.getSpeed()));
             }
         });
 
@@ -304,6 +302,7 @@ public class MyJob implements Serializable {
                 }
 
 //                System.out.println(String.format("用户号码: %s, 运行距离: %.2fm, 运行时间: %.2fmin, 运行速度: %.2fkm/h",userRecordList.get(0).getMsisdn(), distance,runTime/1000D/60D,(distance/1000D)/(runTime/1000D/60D/60D)));
+//                System.out.println(String.format("某手机用户, 运行距离: %.2fm, 运行时间: %.2fmin, 运行速度: %.2fkm/h", distance,runTime/1000.0D/60.0D,(distance/1000.0D)/(runTime/1000.0D/3600.0D)));
                 return list;
             } else {
                 return new ArrayList<UserReport>(); //返回空的list
@@ -345,15 +344,15 @@ public class MyJob implements Serializable {
             int guestCounter = userReportList.size();
 
             //路段平均速度
-            double sumSpeed = 0D;
+            double sumSpeed = 0.0D;
             int sumGuestCounter = 0;
             for (UserReport report : userReportList) {
-                double userSpeed = (report.getDistance()/1000D)/(report.getTime()/1000D/60D/60D);
-                if(userSpeed >= 0D && userSpeed <= 120D) {
+                double userSpeed = (report.getDistance()/1000.0D)/(report.getTime()/1000.0D/60.0D/60.0D);
+                if(userSpeed >= 0.0D && userSpeed <= 120.0D) {
                     sumSpeed += userSpeed;
                     sumGuestCounter++;
-                } else if (userSpeed <= 180D) {
-                    sumSpeed += 120D;
+                } else if (userSpeed < 180.0D) {        //速度不在[0,120]内的用户，速度归为120
+                    sumSpeed += 120.0D;
                     sumGuestCounter++;
                 }
             }

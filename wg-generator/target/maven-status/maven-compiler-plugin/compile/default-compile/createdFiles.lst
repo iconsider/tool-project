@@ -1,5 +1,0 @@
-org\iconsider\generator\GeneratorByTime.class
-org\iconsider\utils\SpringContextInstance.class
-org\iconsider\model\Report.class
-org\iconsider\utils\DateUtils.class
-org\iconsider\generator\GeneratorEvery20Mins.class
