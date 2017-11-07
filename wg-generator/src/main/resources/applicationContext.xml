@@ -10,18 +10,19 @@
 
     <context:component-scan base-package="org.iconsider" />
 
-    <!--<bean id="oracleDataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+    <bean id="oracleDataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
         <property name="driverClassName" value="oracle.jdbc.driver.OracleDriver"></property>
         <property name="url" value="jdbc:oracle:thin:@//192.168.35.24:1521/etl_low"></property>
         <property name="username" value="hanxin_nil"></property>
-        <property name="password" value="hanxin@nsn%123"></property>
+        <!--<property name="password" value="hanxin@nsn%123"></property>-->
+        <property name="password" value="HanxinNil%ora#!456"></property>
     </bean>
     <bean id="oracleJdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate">
         <property name="dataSource" ref="oracleDataSource"></property>
-    </bean>-->
+    </bean>
 
     <!-- 笔记本测试环境pg数据库 -->
-    <bean id="pgDataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+    <!--<bean id="pgDataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
         <property name="driverClassName" value="org.postgresql.Driver"></property>
         <property name="url" value="jdbc:postgresql://host1:5432/postgres"></property>
         <property name="username" value="postgres"></property>
@@ -29,6 +30,6 @@
     </bean>
     <bean id="pgJdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate">
         <property name="dataSource" ref="pgDataSource"></property>
-    </bean>
+    </bean>-->
 
 </beans>
