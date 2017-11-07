@@ -50,7 +50,7 @@ public class GeneratorEvery20Mins {
 
 
     public void generate(String dateTime) {
-        System.out.println(dateTime);
+//        System.out.println(dateTime);
         List<Report> list = this.queryForSection();
 //        System.out.println(list.size());
 
