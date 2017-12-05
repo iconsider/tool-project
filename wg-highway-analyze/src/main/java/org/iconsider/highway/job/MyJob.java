@@ -1,11 +1,9 @@
 package org.iconsider.highway.job;
 
-import org.apache.avro.generic.GenericData;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.*;
-import org.datanucleus.store.types.backed.*;
 import org.iconsider.highway.dao.HighwayDao;
 import org.iconsider.highway.model.*;
 import scala.Tuple2;
@@ -35,8 +33,9 @@ public class MyJob implements Serializable {
 
     public void task0(SparkConf sparkConf) {
         JavaSparkContext javaSparkContext = new JavaSparkContext(sparkConf);
-        JavaRDD<String> fiveMinRecordRDD = javaSparkContext.textFile("hdfs://host1:9000/user/hanxinnil/highwayInfo/201709221400");
+//        JavaRDD<String> fiveMinRecordRDD = javaSparkContext.textFile("hdfs://host1:9000/user/hanxinnil/highwayInfo/201709221400");
 //        JavaRDD<String> fiveMinRecordRDD = javaSparkContext.textFile("hdfs://host1:9000/user/hanxinnil/highwayInfo/201709290200");
+        JavaRDD<String> fiveMinRecordRDD = javaSparkContext.textFile("hdfs://host1:9000/user/hanxinnil/highwayInfo/201710011400");
 
 
         fiveMinRecordRDD.mapPartitionsToPair(new PairFlatMapFunction<Iterator<String>, String, List<Record>>() {
@@ -108,7 +107,7 @@ public class MyJob implements Serializable {
             }
         }).foreach(new VoidFunction<SectionReport>() {
             public void call(SectionReport sectionReport) throws Exception {
-                System.out.println(String.format("sectionId:%s, highwayId:%s, direction:%s, guest:%s, speed:%.2f", sectionReport.getSectionId(), sectionReport.getHighwayId(), sectionReport.getDirection(), sectionReport.getGuestCounter(), sectionReport.getSpeed()));
+                System.out.println(String.format("sectionId:%-4s, highwayId:%-4s, direction:%s, guest:%-4s, speed:%.2f", sectionReport.getSectionId(), sectionReport.getHighwayId(), sectionReport.getDirection(), sectionReport.getGuestCounter(), sectionReport.getSpeed()));
             }
         });
 
@@ -219,6 +218,7 @@ public class MyJob implements Serializable {
 
             //把单个用户的快照记录（最多4条）按lasttime排序
             Collections.sort(userRecordList, new Comparator<Record>() {
+                @Override
                 public int compare(Record o1, Record o2) {
                     long startTime1 = o1.getLasttime();
                     long startTime2 = o2.getLasttime();
@@ -348,13 +348,35 @@ public class MyJob implements Serializable {
             int sumGuestCounter = 0;
             for (UserReport report : userReportList) {
                 double userSpeed = (report.getDistance()/1000.0D)/(report.getTime()/1000.0D/60.0D/60.0D);
-                if(userSpeed >= 0.0D && userSpeed <= 120.0D) {
-                    sumSpeed += userSpeed;
-                    sumGuestCounter++;
-                } else if (userSpeed < 180.0D) {        //速度不在[0,120]内的用户，速度归为120
-                    sumSpeed += 120.0D;
-                    sumGuestCounter++;
+
+                if(guestCounter >= 600) {
+                    if(userSpeed >= 0.0D && userSpeed <= 120.0D) {
+                        sumSpeed += userSpeed;
+                        sumGuestCounter++;
+                    } else if (userSpeed < 180.0D) {
+                        sumSpeed += 120.0D;
+                        sumGuestCounter++;
+                    }
+                } else if (guestCounter >= 400) {
+                    if(userSpeed >= 5.0D && userSpeed <= 120.0D) {
+                        sumSpeed += userSpeed;
+                        sumGuestCounter++;
+                    } else if (userSpeed < 180.0D) {
+                        sumSpeed += 120.0D;
+                        sumGuestCounter++;
+                    }
+                } else {
+                    if(userSpeed >= 8.0D && userSpeed <= 120.0D) {
+                        sumSpeed += userSpeed;
+                        sumGuestCounter++;
+                    } else if (userSpeed < 180.0D) {
+                        sumSpeed += 120.0D;
+                        sumGuestCounter++;
+                    }
                 }
+
+
+
             }
             double speed = sumSpeed/sumGuestCounter;
 
