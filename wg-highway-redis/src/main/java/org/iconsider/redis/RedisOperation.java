@@ -15,11 +15,12 @@ public class RedisOperation {
     public static void main(String[] args) {
         ApplicationContext applicationContext = new ClassPathXmlApplicationContext("applicationContext.xml");
         StringRedisTemplate stringRedisTemplate = applicationContext.getBean("stringRedisTemplate", StringRedisTemplate.class);
-
         Set<String> set = stringRedisTemplate.keys("hr:*");
 
-        System.out.println(String.format("hr:*的个数：%s", set.size()));
+        //清除旧数据
+        stringRedisTemplate.delete("highway-resident");
 
+        System.out.println(String.format("hr:*的个数：%s", set.size()));
 
         //总常驻用户数量
         long num = 0;
