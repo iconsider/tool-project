@@ -20,20 +20,28 @@ import java.util.*;
 public class GeneratorEvery20Mins {
     public static void main(String[] args) {
         System.out.println("start generate data app");
-
         GeneratorEvery20Mins generator = SpringContextInstance.getBean("generatorEvery20Mins", GeneratorEvery20Mins.class);
-        while (true) {
-            if (DateUtils.isMod20Min()) {
-              generator.generate();
+        if (args.length == 1) {
+            if("product".equals(args[0])) {
+                System.out.println("product mode");
+                while (true) {
+                    if (DateUtils.isMod20Min()) {
+                        generator.generate();
+                    }
+                    try {
+                        Thread.currentThread().sleep(1000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                        System.out.println("睡眠异常");
+                    }
+                }
+            } else {
+                System.out.println("test mode");
+                generator.generate();
             }
-            try {
-                Thread.currentThread().sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-                System.out.println("睡眠异常");
-            }
+        } else {
+            System.out.println("plz input product or test");
         }
-//        generator.generate();
     }
 
     public void generate() {
@@ -99,14 +107,14 @@ public class GeneratorEvery20Mins {
      */
     public int saveReports(final List<Report> list) {
         JdbcTemplate jdbcTemplate = SpringContextInstance.getBean("jdbcTemplate", JdbcTemplate.class);
-        String sql = "INSERT INTO f_hx_highway_statistic_20m (start_time, highway_name, section_name, direction, guest_count, speed) VALUES (to_timestamp(?,'YYYY-MM-DD HH24:MI:SS'),?,?,?,?,?)";
+        String sql = "INSERT INTO f_hx_highway_statistic (start_time, highway_id, section_id, direction, guest_count, speed) VALUES (to_timestamp(?,'YYYY-MM-DD HH24:MI:SS'),?,?,?,?,?)";
         int[] result = jdbcTemplate.batchUpdate(sql, new BatchPreparedStatementSetter() {
             @Override
             public void setValues(PreparedStatement preparedStatement, int i) throws SQLException {
                 Report report = list.get(i);
                 preparedStatement.setTimestamp(1, report.getStart_time());
-                preparedStatement.setString(2, report.getHighway_name());
-                preparedStatement.setString(3, report.getSection_name());
+                preparedStatement.setInt(2, report.getHighway_id());
+                preparedStatement.setInt(3, report.getSection_id());
                 preparedStatement.setString(4, report.getDirection());
                 preparedStatement.setInt(5, report.getGuest_count());
                 preparedStatement.setDouble(6, report.getSpeed());
